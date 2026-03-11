@@ -1,0 +1,101 @@
+# JPX 33業種区分 (東証33業種)
+sectors:
+  - code: 1
+    name_ja: 水産・農林業
+    name_en: Fishery, Agriculture & Forestry
+  - code: 2
+    name_ja: 鉱業
+    name_en: Mining
+  - code: 3
+    name_ja: 建設業
+    name_en: Construction
+  - code: 4
+    name_ja: 食料品
+    name_en: Foods
+  - code: 5
+    name_ja: 繊維製品
+    name_en: Textiles & Apparel
+  - code: 6
+    name_ja: パルプ・紙
+    name_en: Pulp & Paper
+  - code: 7
+    name_ja: 化学
+    name_en: Chemicals
+  - code: 8
+    name_ja: 医薬品
+    name_en: Pharmaceutical
+  - code: 9
+    name_ja: 石油・石炭製品
+    name_en: Oil & Coal Products
+  - code: 10
+    name_ja: ゴム製品
+    name_en: Rubber Products
+  - code: 11
+    name_ja: ガラス・土石製品
+    name_en: Glass & Ceramics
+  - code: 12
+    name_ja: 鉄鋼
+    name_en: Iron & Steel
+  - code: 13
+    name_ja: 非鉄金属
+    name_en: Nonferrous Metals
+  - code: 14
+    name_ja: 金属製品
+    name_en: Metal Products
+  - code: 15
+    name_ja: 機械
+    name_en: Machinery
+  - code: 16
+    name_ja: 電気機器
+    name_en: Electric Appliances
+  - code: 17
+    name_ja: 輸送用機器
+    name_en: Transportation Equipment
+  - code: 18
+    name_ja: 精密機器
+    name_en: Precision Instruments
+  - code: 19
+    name_ja: その他製品
+    name_en: Other Products
+  - code: 20
+    name_ja: 電気・ガス業
+    name_en: Electric Power & Gas
+  - code: 21
+    name_ja: 陸運業
+    name_en: Land Transportation
+  - code: 22
+    name_ja: 海運業
+    name_en: Marine Transportation
+  - code: 23
+    name_ja: 空運業
+    name_en: Air Transportation
+  - code: 24
+    name_ja: 倉庫・運輸関連業
+    name_en: Warehousing & Harbor Transportation
+  - code: 25
+    name_ja: 情報・通信業
+    name_en: Information & Communication
+  - code: 26
+    name_ja: 卸売業
+    name_en: Wholesale Trade
+  - code: 27
+    name_ja: 小売業
+    name_en: Retail Trade
+  - code: 28
+    name_ja: 銀行業
+    name_en: Banks
+  - code: 29
+    name_ja: 証券、商品先物取引業
+    name_en: Securities & Commodity Futures
+  - code: 30
+    name_ja: 保険業
+    name_en: Insurance
+  - code: 31
+    name_ja: その他金融業
+    name_en: Other Financing Business
+  - code: 32
+    name_ja: 不動産業
+    name_en: Real Estate
+  - code: 33
+    name_ja: サービス業
+    name_en: Services

@@ -1,0 +1,24 @@
+# 企業規模区分の定義 (中小企業基本法ベース)
+company_size:
+  large:
+    label_ja: 大企業
+    label_en: Large Enterprise
+    employees_ge: 300
+    capital_ge_million_jpy: 300
+
+  sme:
+    label_ja: 中小企業
+    label_en: SME
+    employees_lt: 300
+    capital_lt_million_jpy: 300
+
+  sole_proprietor:
+    label_ja: 個人事業主
+    label_en: Sole Proprietor
+
+# CSVの規模カテゴリ列名
+size_column: company_size_category
+size_labels:
+  large: 大企業
+  sme: 中小企業
+  sole_proprietor: 個人事業主
