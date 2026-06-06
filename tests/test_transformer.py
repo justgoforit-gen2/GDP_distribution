@@ -9,6 +9,8 @@ from modules.transformer import (
     build_employee_count_matrix,
     build_gdp_matrix,
     build_per_company_matrix,
+    build_per_company_profit_matrix,
+    build_per_person_profit_matrix,
     build_profit_matrix,
 )
 
@@ -83,3 +85,17 @@ def test_employee_pivot():
     m = build_employee_count_matrix(_mini_census())
     assert m.loc["E", "中小企業"] == 300_000
     assert m.loc["A", "大企業"] == 10_000
+
+
+def test_per_company_profit_unit_conversion():
+    # E 大企業: 利益 1,000 billion / 500社 * 1000 = 2,000 百万円/社
+    m = build_per_company_profit_matrix(_mini_census(), _mini_corp())
+    assert m.loc["E", "大企業"] == pytest.approx(1_000 * 1000 / 500)
+    # A 中小企業: 利益データなし → 0
+    assert m.loc["A", "中小企業"] == 0
+
+
+def test_per_person_profit_unit_conversion():
+    # E 大企業: 利益 1,000 billion / 200,000人 * 1e5 = 500 万円/人
+    m = build_per_person_profit_matrix(_mini_census(), _mini_corp())
+    assert m.loc["E", "大企業"] == pytest.approx(1_000 * 1e5 / 200_000)

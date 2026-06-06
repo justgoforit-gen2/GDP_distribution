@@ -83,6 +83,31 @@ def build_per_person_matrix(df_census: pd.DataFrame) -> pd.DataFrame:
     return per_pp
 
 
+def build_per_company_profit_matrix(df_census: pd.DataFrame, df_corp: pd.DataFrame) -> pd.DataFrame:
+    """営業利益 / 企業数 → 百万円/社.
+
+    注意: profit は法人企業統計（資本金階級ベース）、count は経済センサス（従業者規模ベース）
+    のため、規模区分の定義は厳密には一致しない（近似値）。
+    """
+    profit = _pivot(df_corp, "operating_profit_billion_jpy")
+    cnt    = _pivot(df_census, "company_count").replace(0, np.nan)
+    per_co = (profit / cnt * 1000).fillna(0)
+    per_co.index.name = "jsic_code"
+    return per_co
+
+
+def build_per_person_profit_matrix(df_census: pd.DataFrame, df_corp: pd.DataFrame) -> pd.DataFrame:
+    """営業利益 / 従業者数 → 万円/人.
+
+    注意: profit は法人企業統計、employee は経済センサスのため規模区分の定義が異なる（近似値）。
+    """
+    profit = _pivot(df_corp, "operating_profit_billion_jpy")
+    emp    = _pivot(df_census, "employee_count").replace(0, np.nan)
+    per_pp = (profit / emp * 1e5).fillna(0)
+    per_pp.index.name = "jsic_code"
+    return per_pp
+
+
 def add_sector_names(matrix: pd.DataFrame, sectors_df: pd.DataFrame) -> pd.DataFrame:
     """Add Japanese sector name to matrix index."""
     mapping = sectors_df.set_index("code")["name_ja"]

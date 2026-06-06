@@ -18,6 +18,8 @@ from modules.transformer import (
     build_employee_count_matrix,
     build_per_company_matrix,
     build_per_person_matrix,
+    build_per_company_profit_matrix,
+    build_per_person_profit_matrix,
     add_sector_names,
 )
 from modules.heatmap_builder import (
@@ -82,12 +84,14 @@ def _build_matrices(
     sectors   = pd.read_json(sectors_json, orient="split")
 
     raw = {
-        "gdp":    build_gdp_matrix(df_census, df_gdp),
-        "profit": build_profit_matrix(df_corp),
-        "count":  build_company_count_matrix(df_census),
-        "emp":    build_employee_count_matrix(df_census),
-        "per_co": build_per_company_matrix(df_census),
-        "per_pp": build_per_person_matrix(df_census),
+        "gdp":         build_gdp_matrix(df_census, df_gdp),
+        "profit":      build_profit_matrix(df_corp),
+        "count":       build_company_count_matrix(df_census),
+        "emp":         build_employee_count_matrix(df_census),
+        "per_co":      build_per_company_matrix(df_census),
+        "per_pp":      build_per_person_matrix(df_census),
+        "per_co_pft":  build_per_company_profit_matrix(df_census, df_corp),
+        "per_pp_pft":  build_per_person_profit_matrix(df_census, df_corp),
     }
     # Attach sector names as index
     named = {k: add_sector_names(v, sectors) for k, v in raw.items()}
@@ -146,8 +150,10 @@ m_gdp    = _apply_filters(matrices["gdp"])
 m_profit = _apply_filters(matrices["profit"])
 m_count  = _apply_filters(matrices["count"])
 m_emp    = _apply_filters(matrices["emp"])
-m_per_co = _apply_filters(matrices["per_co"])
-m_per_pp = _apply_filters(matrices["per_pp"])
+m_per_co     = _apply_filters(matrices["per_co"])
+m_per_pp     = _apply_filters(matrices["per_pp"])
+m_per_co_pft = _apply_filters(matrices["per_co_pft"])
+m_per_pp_pft = _apply_filters(matrices["per_pp_pft"])
 
 if m_gdp.empty:
     st.warning("フィルタ条件に該当するデータがありません。")
@@ -233,25 +239,36 @@ with tab1:
         st.subheader("1社あたり / 1人あたり指標")
         metric_choice = st.radio(
             "指標を選択",
-            ["1社あたり付加価値 [百万円/社]", "1人あたり付加価値 [万円/人]"],
+            [
+                "1社あたり付加価値 [百万円/社]",
+                "1人あたり付加価値 [万円/人]",
+                "1社あたり営業利益 [百万円/社]",
+                "1人あたり営業利益 [万円/人]",
+            ],
             horizontal=True,
             key="per_unit_radio",
         )
-        if "1社" in metric_choice:
-            fig_per = build_per_unit_heatmap(m_per_co, title="", unit="百万円/社")
-        else:
-            fig_per = build_per_unit_heatmap(m_per_pp, title="", unit="万円/人")
+        PER_UNIT_MAP = {
+            "1社あたり付加価値 [百万円/社]": (m_per_co,     "百万円/社"),
+            "1人あたり付加価値 [万円/人]":  (m_per_pp,     "万円/人"),
+            "1社あたり営業利益 [百万円/社]": (m_per_co_pft, "百万円/社"),
+            "1人あたり営業利益 [万円/人]":  (m_per_pp_pft, "万円/人"),
+        }
+        m_per, per_unit = PER_UNIT_MAP[metric_choice]
+        fig_per = build_per_unit_heatmap(m_per, title="", unit=per_unit)
         st.plotly_chart(fig_per, use_container_width=True)
 
 # ── Tab 2: Detail Table ──────────────────────────────────────
 with tab2:
     metric_opts = {
-        "GDP寄与額（付加価値）[億円]": m_gdp,
-        "利益（営業利益）[億円]":      m_profit,
-        "企業数 [社]":                 m_count,
-        "従業者数 [人]":               m_emp,
-        "1社あたり付加価値 [百万円/社]": m_per_co,
-        "1人あたり付加価値 [万円/人]":  m_per_pp,
+        "GDP寄与額（付加価値）[億円]":    m_gdp,
+        "利益（営業利益）[億円]":         m_profit,
+        "企業数 [社]":                   m_count,
+        "従業者数 [人]":                 m_emp,
+        "1社あたり付加価値 [百万円/社]":  m_per_co,
+        "1人あたり付加価値 [万円/人]":   m_per_pp,
+        "1社あたり営業利益 [百万円/社]":  m_per_co_pft,
+        "1人あたり営業利益 [万円/人]":   m_per_pp_pft,
     }
     sel_metric = st.selectbox("表示指標", options=list(metric_opts.keys()))
     tbl = metric_opts[sel_metric].copy()
