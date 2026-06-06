@@ -1,4 +1,8 @@
-"""One-shot script to generate sample CSV files in data/samples/."""
+"""DEPRECATED. オフライン用フォールバック。出力は旧 JPX33 × 3規模 で現行アプリは読めない。
+通常は scripts/build_estat_dataset.py を使うこと。
+
+One-shot script to generate sample CSV files in data/samples/.
+"""
 import sys
 from pathlib import Path
 

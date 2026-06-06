@@ -10,7 +10,7 @@ import plotly.graph_objects as go
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from modules.data_loader import load_census, load_corporate_stats, load_gdp, load_jpx33_sectors
+from modules.data_loader import load_census, load_corporate_stats, load_gdp, load_jsic_sectors
 from modules.transformer import (
     build_gdp_matrix,
     build_profit_matrix,
@@ -30,7 +30,7 @@ from modules.heatmap_builder import (
 )
 from modules.insights import compute_sector_mismatches
 
-DATA_DIR   = Path(__file__).parent / "data" / "samples"
+DATA_DIR   = Path(__file__).parent / "data" / "processed"
 CONFIG_DIR = Path(__file__).parent / "config"
 
 st.set_page_config(
@@ -49,14 +49,14 @@ with st.sidebar:
     unit_scale = st.radio("表示単位", ["十億円", "兆円"], horizontal=True,
                           help="ヒートマップの金額単位を切替")
 
-    sectors_df = load_jpx33_sectors(CONFIG_DIR / "jpx33_sectors.yaml")
+    sectors_df = load_jsic_sectors(CONFIG_DIR / "jsic_sectors.yaml")
     all_sector_names = sectors_df["name_ja"].tolist()
     sel_sectors = st.multiselect("業種フィルタ（空=全業種）", options=all_sector_names, default=[])
 
     sel_sizes = st.multiselect(
         "規模フィルタ",
-        options=["大企業", "中小企業", "個人事業主"],
-        default=["大企業", "中小企業", "個人事業主"],
+        options=["大企業", "中小企業"],
+        default=["大企業", "中小企業"],
     )
     if not sel_sizes:
         st.warning("規模を1つ以上選択してください")
@@ -98,7 +98,10 @@ try:
     df_census, df_corp, df_gdp = _load_all(str(DATA_DIR))
 except Exception as e:
     st.error(f"データ読込エラー: {e}")
-    st.info("先に `python scripts/generate_samples.py` を実行してサンプルデータを生成してください。")
+    st.info(
+        "先に `python scripts/build_estat_dataset.py --year 2023` を実行して "
+        "e-Stat から実データを取得してください（要 ESTAT_API_KEY）。"
+    )
     st.stop()
 
 # Serialize for cache key stability
@@ -157,9 +160,24 @@ m_profit_s, pft_unit, _    = _scale(m_profit)
 # ─── KPI Bar ─────────────────────────────────────────────────
 st.title("日本経済 セクター別・規模別 分布分析")
 st.caption(
-    "JPX33業種 × 企業規模（大企業・中小企業・個人事業主）で分解した"
+    "JSIC大分類（約19業種） × 企業規模（大企業・中小企業）で分解した"
     "GDP寄与・利益・企業数・生産性の分布を可視化"
 )
+with st.expander("データソース・前提・近似", expanded=False):
+    st.markdown(
+        """
+- **業種分類**: 日本標準産業分類（JSIC）大分類 A〜S。東証 JPX33業種ではない。
+- **企業数・従業者数・付加価値**: 経済センサス‐活動調査 2021（statsDataId `0004006327`）。
+  - 経済センサスは5年周期。次回は2026年実施・2027年確報予定。
+  - **大企業 = 従業者数 50人以上**、**中小企業 = 50人未満** で集約（経済センサスの規模区分上の近似）。
+- **営業利益等**: 法人企業統計調査 年度次 金融業・保険業以外（statsDataId `0003060791`）。
+  - **大企業 = 資本金10億円以上**、**中小企業 = 資本金1千万〜10億円未満** で集約。
+  - **金融業・保険業（J）は法人企業統計の別表に分かれているため、本データでは0** として扱う。
+- **GDP**: 国民経済計算 経済活動別国内総生産（名目, 暦年, statsDataId `0004028489`）。
+  - 産業別までしかなく、企業規模別配分は経済センサスの付加価値比で按分（直接計測ではない）。
+- **JSIC↔SNA産業区分の差**: 一部業種（生活関連・娯楽 N、複合サービス Q 等）は SNA の経済活動分類に直接対応せず、近似または合算。
+        """
+    )
 
 k1, k2, k3, k4, k5 = st.columns(5)
 k1.metric("GDP寄与合計", f"{m_gdp.sum().sum() / 1_000:,.1f} 兆円")
@@ -206,8 +224,6 @@ with tab1:
             m_profit_rate = m_profit[profit_cols].div(
                 m_gdp[profit_cols].replace(0, float("nan"))
             ).fillna(0) * 100
-            if "個人事業主" in sel_sizes:
-                m_profit_rate["個人事業主"] = 0.0
             fig_pft = build_profit_rate_heatmap(m_profit_rate, title="")
         else:
             st.subheader(f"利益（営業利益）[{pft_unit}]")
@@ -278,8 +294,8 @@ with tab3:
             "GDP寄与は相対的に小さいが利益占有率が高い業種。少ない付加価値で大きな利益を確保。",
         "大企業利益集中セクター":
             "大企業の利益シェアが付加価値シェアを大幅に上回る業種。大企業が利益を取りやすい構造。",
-        "中小・個人GDP支援セクター":
-            "中小企業・個人事業主がGDP（付加価値）を支えているにもかかわらず、利益が薄い業種。",
+        "中小企業GDP支援セクター":
+            "中小企業がGDP（付加価値）を支えているにもかかわらず、利益が薄い業種。",
         "企業数多・生産性低セクター":
             "企業数占有率が高いが1社あたり付加価値が低い業種。企業数の多さが生産性に直結していない。",
     }

@@ -6,7 +6,7 @@ from __future__ import annotations
 import pandas as pd
 import numpy as np
 
-SIZES = ["大企業", "中小企業", "個人事業主"]
+SIZES = ["大企業", "中小企業"]
 
 
 def compute_sector_mismatches(
@@ -51,31 +51,32 @@ def compute_sector_mismatches(
     findings["利益大・GDP寄与小セクター"] = f2
 
     # 3. 大企業利益集中: 大企業の利益シェアが付加価値シェアを上回る
-    large_profit_share = profit_matrix["大企業"] / profit_matrix[["大企業", "中小企業"]].sum(axis=1).replace(0, np.nan)
+    large_profit_share = (profit_matrix["大企業"] /
+                          profit_matrix[["大企業", "中小企業"]].sum(axis=1).replace(0, np.nan))
     large_va_share = gdp_matrix["大企業"] / gdp_matrix.sum(axis=1).replace(0, np.nan)
-    gap = (large_profit_share - large_va_share).dropna()
-    threshold_gap = gap.quantile(0.70)
+    gap = (large_profit_share - large_va_share)
+    threshold_gap = gap.dropna().quantile(0.70)
     f3 = pd.DataFrame({
         "大企業利益シェア(%)": (large_profit_share * 100).round(1),
         "大企業付加価値シェア(%)": (large_va_share * 100).round(1),
         "シェア差分(pp)": (gap * 100).round(1),
     })
-    f3 = f3[gap >= threshold_gap].sort_values("シェア差分(pp)", ascending=False)
+    f3 = f3[gap.fillna(-np.inf) >= threshold_gap].sort_values("シェア差分(pp)", ascending=False)
     findings["大企業利益集中セクター"] = f3
 
-    # 4. 中小・個人がGDPを支えるが利益薄: 中小+個人の付加価値シェアが高いが営業利益率は低い
-    sme_va_share = (gdp_matrix[["中小企業", "個人事業主"]].sum(axis=1) /
+    # 4. 中小企業がGDPを支えるが利益薄: 中小の付加価値シェアが高いが営業利益率は低い
+    sme_va_share = (gdp_matrix["中小企業"] /
                     gdp_matrix.sum(axis=1).replace(0, np.nan))
     sme_profit_share = profit_matrix["中小企業"] / profit_matrix[["大企業", "中小企業"]].sum(axis=1).replace(0, np.nan)
-    gap2 = (sme_va_share - sme_profit_share).dropna()
-    threshold_sme = gap2.quantile(0.65)
+    gap2 = sme_va_share - sme_profit_share
+    threshold_sme = gap2.dropna().quantile(0.65)
     f4 = pd.DataFrame({
-        "中小+個人 GDP占有率(%)": (sme_va_share * 100).round(1),
+        "中小 GDP占有率(%)": (sme_va_share * 100).round(1),
         "中小 利益シェア(%)": (sme_profit_share * 100).round(1),
         "格差(pp)": (gap2 * 100).round(1),
     })
-    f4 = f4[gap2 >= threshold_sme].sort_values("格差(pp)", ascending=False)
-    findings["中小・個人GDP支援セクター"] = f4
+    f4 = f4[gap2.fillna(-np.inf) >= threshold_sme].sort_values("格差(pp)", ascending=False)
+    findings["中小企業GDP支援セクター"] = f4
 
     # 5. 企業数多・生産性低: 企業数シェアが高いが1社あたり付加価値が低い
     count_total_per_sector = count_matrix.sum(axis=1)
