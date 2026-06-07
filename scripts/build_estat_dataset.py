@@ -437,7 +437,10 @@ def pull_corporate_stats(client: EStatClient, fiscal_year: int) -> pd.DataFrame:
 def main() -> int:
     p = argparse.ArgumentParser()
     p.add_argument("--year", type=int, default=2023,
-                   help="GDP対象暦年（SNA, default 2023）。法人企業統計は同じ番号を年度として使用。")
+                   help="GDP対象暦年（SNA, default 2023）。")
+    p.add_argument("--corp-years", type=int, nargs="+",
+                   default=[2020, 2021, 2022, 2023, 2024],
+                   help="法人企業統計の年度（複数可、default 2020-2024）")
     p.add_argument("--no-cache", action="store_true",
                    help="estat_client のディスクキャッシュを無効化")
     p.add_argument("--output-dir", type=str,
@@ -463,11 +466,14 @@ def main() -> int:
     gdp.to_csv(gdp_path, index=False, encoding="utf-8-sig")
     _info(f"[gdp] wrote {gdp_path}")
 
-    # 3) Corporate stats (法人企業統計, args.year as fiscal year)
-    corp = pull_corporate_stats(client, args.year)
+    # 3) Corporate stats (法人企業統計, 複数年度)
+    corp_frames = []
+    for fy in args.corp_years:
+        corp_frames.append(pull_corporate_stats(client, fy))
+    corp = pd.concat(corp_frames, ignore_index=True)
     corp_path = output_dir / "corporate_stats.csv"
     corp.to_csv(corp_path, index=False, encoding="utf-8-sig")
-    _info(f"[corp] wrote {corp_path}")
+    _info(f"[corp] wrote {corp_path} (years: {args.corp_years})")
 
     _info("\n=== Summary ===")
     _info(f"census           rows: {len(census)}  sectors: {census['jsic_code'].nunique()}")

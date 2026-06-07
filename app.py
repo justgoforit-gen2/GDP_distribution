@@ -96,6 +96,9 @@ with st.sidebar:
         st.warning("規模を1つ以上選択してください")
         st.stop()
 
+    # 法人企業統計の年度スライダー（corp モード時のみ）
+    sel_corp_year = None
+
 # ─── Data loading (cached) ──────────────────────────────────
 @st.cache_data(show_spinner="データ読込中...")
 def _load_all(data_dir: str) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
@@ -150,10 +153,28 @@ except Exception as e:
     )
     st.stop()
 
+# 法人企業統計の利用可能年度（CSV から動的取得）
+corp_years_avail = sorted(df_corp["survey_year"].unique().tolist())
+
+# サイドバーにスライダー追加（USE_CORP かつ複数年あるときのみ）
+with st.sidebar:
+    if USE_CORP and len(corp_years_avail) > 1:
+        sel_corp_year = st.select_slider(
+            "法人企業統計の年度",
+            options=corp_years_avail,
+            value=corp_years_avail[-1],  # 最新
+            help="法人企業統計年報の年度を切替（過去5年分）。経済センサスは固定（2021）",
+        )
+    else:
+        sel_corp_year = corp_years_avail[-1] if corp_years_avail else None
+
+# corp_year でフィルタした df_corp を行列構築に渡す
+df_corp_year = df_corp[df_corp["survey_year"] == sel_corp_year] if sel_corp_year else df_corp
+
 # Serialize for cache key stability
 matrices = _build_matrices(
     df_census.to_json(orient="split"),
-    df_corp.to_json(orient="split"),
+    df_corp_year.to_json(orient="split"),
     df_gdp.to_json(orient="split"),
     sectors_df.to_json(orient="split"),
 )
@@ -218,10 +239,12 @@ m_profit_s, pft_unit, _    = _scale(m_profit)
 
 # ─── KPI Bar ─────────────────────────────────────────────────
 st.title("日本経済 セクター別・規模別 分布分析")
-_src_label = "法人企業統計ベース（資本金10億で区切る）" if USE_CORP else "経済センサスベース（従業者50人で区切る）"
+if USE_CORP:
+    _src_label = f"法人企業統計ベース（資本金10億で区切る・**{sel_corp_year}年度**）"
+else:
+    _src_label = "経済センサスベース（従業者50人で区切る・2021年）"
 st.caption(
-    f"JSIC大分類（約19業種） × 企業規模（大企業・中小企業）で分解 — "
-    f"**現在のデータソース: {_src_label}**"
+    f"JSIC大分類（約19業種） × 企業規模で分解 — 現在のデータソース: {_src_label}"
 )
 with st.expander("データソース・前提・近似", expanded=False):
     st.markdown(
