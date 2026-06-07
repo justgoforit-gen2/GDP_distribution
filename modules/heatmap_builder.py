@@ -39,6 +39,14 @@ def _base_heatmap(
     n_cols = len(x)
     n_rows = len(y)
 
+    # カラースケールは合計行・合計列を除いた本体だけで決める
+    body = matrix.values
+    if body.size > 0 and pd.notna(body).any():
+        body_max = float(pd.Series(body.flatten()).dropna().max())
+        body_min = float(pd.Series(body.flatten()).dropna().min())
+    else:
+        body_max, body_min = 1.0, 0.0
+
     text  = [[f"{v:{fmt}}" for v in row] for row in z]
     hover = [[f"{v:{fmt}} {unit}" for v in row] for row in z]
 
@@ -53,6 +61,8 @@ def _base_heatmap(
         textfont={"size": 13},
         hovertemplate="<b>%{y}</b><br>%{x}<br>%{customdata}<extra></extra>",
         showscale=True,
+        zmin=body_min,
+        zmax=body_max,
     )
     if zmid is not None:
         heatmap_kwargs["zmid"] = zmid
