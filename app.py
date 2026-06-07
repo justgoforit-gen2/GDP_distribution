@@ -230,14 +230,36 @@ with st.expander("データソース・前提・近似", expanded=False):
     )
 
 k1, k2, k3, k4, k5 = st.columns(5)
-k1.metric("GDP寄与合計", f"{m_gdp.sum().sum() / 1_000:,.1f} 兆円")
+
+# データソースに応じてラベル・分母を動的に切替
+if USE_CORP:
+    k1_label = "付加価値合計（法人企業統計）"
+    k1_help  = "法人企業統計の付加価値（営業純益＋人件費＋支払利息＋賃借料＋租税公課）合計。SNAのGDPとは別物。"
+    k5_label = "利益率（営業利益／付加価値）"
+    k5_help  = "営業利益 ÷ 法人企業統計の付加価値"
+    k3_label = "法人数合計"
+    k3_unit  = "法人"
+    k4_label = "従業員数合計"
+    k4_unit  = "人"
+else:
+    k1_label = "GDP寄与合計"
+    k1_help  = "国民経済計算（SNA）の名目GDPを経済センサスの付加価値比で規模別に按分した合計。"
+    k5_label = "平均利益率（GDP比）"
+    k5_help  = "営業利益 ÷ GDP寄与額"
+    k3_label = "事業所数合計"
+    k3_unit  = "事業所"
+    k4_label = "従業者数合計"
+    k4_unit  = "人"
+
+k1.metric(k1_label, f"{m_gdp.sum().sum() / 1_000:,.1f} 兆円", help=k1_help)
 k2.metric("営業利益合計", f"{m_profit[['大企業','中小企業']].sum().sum() / 1_000:,.1f} 兆円"
           if "大企業" in m_profit.columns else "N/A")
-k3.metric("企業数合計",  f"{int(m_count.sum().sum()):,} 社")
-k4.metric("従業者数合計", f"{int(m_emp.sum().sum()):,} 人")
-k5.metric("平均利益率(GDP比)",
+k3.metric(k3_label, f"{int(m_count.sum().sum()):,} {k3_unit}")
+k4.metric(k4_label, f"{int(m_emp.sum().sum()):,} {k4_unit}")
+k5.metric(k5_label,
           f"{m_profit[['大企業','中小企業']].sum().sum() / m_gdp.sum().sum() * 100:.1f}%"
-          if "大企業" in m_profit.columns else "N/A")
+          if "大企業" in m_profit.columns and m_gdp.sum().sum() > 0 else "N/A",
+          help=k5_help)
 
 st.divider()
 
@@ -248,28 +270,35 @@ tab1, tab2, tab3 = st.tabs(["4ヒートマップ", "詳細テーブル", "イン
 with tab1:
     col1, col2 = st.columns(2)
 
+    # データソースに応じて見出しを切替
+    gdp_title  = f"付加価値（法人企業統計）[{gdp_unit}]" if USE_CORP else f"GDP寄与額（付加価値）[{gdp_unit}]"
+    cnt_title  = "法人数分布 [法人]" if USE_CORP else "事業所数分布 [事業所]"
+    emp_title  = "従業員数分布 [人]" if USE_CORP else "従業者数分布 [人]"
+    rate_label = "GDP比率 (%)" if not USE_CORP else "付加価値比率 (%)"
+
     with col1:
-        st.subheader(f"GDP寄与額（付加価値）[{gdp_unit}]")
+        st.subheader(gdp_title)
         fig_gdp = build_gdp_heatmap(m_gdp_s, title="")
         st.plotly_chart(fig_gdp, use_container_width=True)
 
-        st.subheader("企業数分布 [社]")
+        st.subheader(cnt_title)
         fig_cnt = build_company_count_heatmap(m_count, title="")
         st.plotly_chart(fig_cnt, use_container_width=True)
 
-        st.subheader("従業者数分布 [人]")
+        st.subheader(emp_title)
         fig_emp = build_employee_count_heatmap(m_emp, title="")
         st.plotly_chart(fig_emp, use_container_width=True)
 
     with col2:
         profit_mode = st.radio(
             "利益表示モード",
-            ["金額", "GDP比率 (%)"],
+            ["金額", rate_label],
             horizontal=True,
             key="profit_mode_radio",
         )
-        if profit_mode == "GDP比率 (%)":
-            st.subheader("利益率（営業利益/GDP比）[%]")
+        if profit_mode == rate_label:
+            denom_label = "付加価値" if USE_CORP else "GDP"
+            st.subheader(f"利益率（営業利益/{denom_label}比）[%]")
             profit_cols = [c for c in ["大企業", "中小企業"] if c in m_profit.columns and c in m_gdp.columns]
             m_profit_rate = m_profit[profit_cols].div(
                 m_gdp[profit_cols].replace(0, float("nan"))
