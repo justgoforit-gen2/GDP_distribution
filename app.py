@@ -12,6 +12,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from modules.data_loader import load_census, load_corporate_stats, load_gdp, load_jsic_sectors
 from modules.transformer import (
+    CAPITAL_CLASSES,
     build_gdp_matrix,
     build_profit_matrix,
     build_company_count_matrix,
@@ -20,13 +21,14 @@ from modules.transformer import (
     build_per_person_matrix,
     build_per_company_profit_matrix,
     build_per_person_profit_matrix,
-    build_corp_company_count_matrix,
-    build_corp_employee_count_matrix,
-    build_corp_value_added_matrix,
-    build_corp_per_company_va_matrix,
-    build_corp_per_person_va_matrix,
-    build_corp_per_company_profit_matrix,
-    build_corp_per_person_profit_matrix,
+    build_corp_company_count_by_capital,
+    build_corp_employee_count_by_capital,
+    build_corp_value_added_by_capital,
+    build_corp_profit_by_capital,
+    build_corp_per_company_va_by_capital,
+    build_corp_per_person_va_by_capital,
+    build_corp_per_company_profit_by_capital,
+    build_corp_per_person_profit_by_capital,
     add_sector_names,
 )
 from modules.heatmap_builder import (
@@ -78,11 +80,18 @@ with st.sidebar:
     all_sector_names = sectors_df["name_ja"].tolist()
     sel_sectors = st.multiselect("業種フィルタ（空=全業種）", options=all_sector_names, default=[])
 
-    sel_sizes = st.multiselect(
-        "規模フィルタ",
-        options=["大企業", "中小企業"],
-        default=["大企業", "中小企業"],
-    )
+    if USE_CORP:
+        sel_sizes = st.multiselect(
+            "資本金階級フィルタ（6区分）",
+            options=CAPITAL_CLASSES,
+            default=CAPITAL_CLASSES,
+        )
+    else:
+        sel_sizes = st.multiselect(
+            "規模フィルタ",
+            options=["大企業", "中小企業"],
+            default=["大企業", "中小企業"],
+        )
     if not sel_sizes:
         st.warning("規模を1つ以上選択してください")
         st.stop()
@@ -107,7 +116,7 @@ def _build_matrices(
     sectors   = pd.read_json(sectors_json, orient="split")
 
     raw = {
-        # 経済センサスベース（従業者規模）
+        # 経済センサスベース（従業者規模 大/中の2列）
         "gdp":         build_gdp_matrix(df_census, df_gdp),
         "profit":      build_profit_matrix(df_corp),
         "count":       build_company_count_matrix(df_census),
@@ -116,14 +125,15 @@ def _build_matrices(
         "per_pp":      build_per_person_matrix(df_census),
         "per_co_pft":  build_per_company_profit_matrix(df_census, df_corp),
         "per_pp_pft":  build_per_person_profit_matrix(df_census, df_corp),
-        # 法人企業統計ベース（資本金階級）
-        "corp_count":      build_corp_company_count_matrix(df_corp),
-        "corp_emp":        build_corp_employee_count_matrix(df_corp),
-        "corp_va":         build_corp_value_added_matrix(df_corp),
-        "corp_per_co_va":  build_corp_per_company_va_matrix(df_corp),
-        "corp_per_pp_va":  build_corp_per_person_va_matrix(df_corp),
-        "corp_per_co_pft": build_corp_per_company_profit_matrix(df_corp),
-        "corp_per_pp_pft": build_corp_per_person_profit_matrix(df_corp),
+        # 法人企業統計ベース（資本金階級 6列）
+        "corp_count":      build_corp_company_count_by_capital(df_corp),
+        "corp_emp":        build_corp_employee_count_by_capital(df_corp),
+        "corp_va":         build_corp_value_added_by_capital(df_corp),
+        "corp_profit":     build_corp_profit_by_capital(df_corp),
+        "corp_per_co_va":  build_corp_per_company_va_by_capital(df_corp),
+        "corp_per_pp_va":  build_corp_per_person_va_by_capital(df_corp),
+        "corp_per_co_pft": build_corp_per_company_profit_by_capital(df_corp),
+        "corp_per_pp_pft": build_corp_per_person_profit_by_capital(df_corp),
     }
     # Attach sector names as index
     named = {k: add_sector_names(v, sectors) for k, v in raw.items()}
@@ -179,9 +189,9 @@ def _scale(m: pd.DataFrame) -> tuple[pd.DataFrame, str, str]:
 
 # データソース切替: 法人企業統計選択時は count/emp/付加価値関連を法人企業統計版に差し替え
 if USE_CORP:
-    # GDP寄与（付加価値）= 法人企業統計の付加価値
+    # 法人企業統計ベース・資本金階級6区分
     m_gdp        = _apply_filters(matrices["corp_va"])
-    m_profit     = _apply_filters(matrices["profit"])
+    m_profit     = _apply_filters(matrices["corp_profit"])
     m_count      = _apply_filters(matrices["corp_count"])
     m_emp        = _apply_filters(matrices["corp_emp"])
     m_per_co     = _apply_filters(matrices["corp_per_co_va"])
@@ -281,13 +291,12 @@ else:
     k4_unit  = "人"
 
 k1.metric(k1_label, f"{m_gdp.sum().sum() / 1_000:,.1f} 兆円", help=k1_help)
-k2.metric("営業利益合計", f"{m_profit[['大企業','中小企業']].sum().sum() / 1_000:,.1f} 兆円"
-          if "大企業" in m_profit.columns else "N/A")
+k2.metric("営業利益合計", f"{m_profit.sum().sum() / 1_000:,.1f} 兆円")
 k3.metric(k3_label, f"{int(m_count.sum().sum()):,} {k3_unit}")
 k4.metric(k4_label, f"{int(m_emp.sum().sum()):,} {k4_unit}")
 k5.metric(k5_label,
-          f"{m_profit[['大企業','中小企業']].sum().sum() / m_gdp.sum().sum() * 100:.1f}%"
-          if "大企業" in m_profit.columns and m_gdp.sum().sum() > 0 else "N/A",
+          f"{m_profit.sum().sum() / m_gdp.sum().sum() * 100:.1f}%"
+          if m_gdp.sum().sum() > 0 else "N/A",
           help=k5_help)
 
 st.divider()
@@ -328,7 +337,7 @@ with tab1:
         if profit_mode == rate_label:
             denom_label = "付加価値" if USE_CORP else "GDP"
             st.subheader(f"利益率（営業利益/{denom_label}比）[%]")
-            profit_cols = [c for c in ["大企業", "中小企業"] if c in m_profit.columns and c in m_gdp.columns]
+            profit_cols = [c for c in m_profit.columns if c in m_gdp.columns]
             m_profit_rate = m_profit[profit_cols].div(
                 m_gdp[profit_cols].replace(0, float("nan"))
             ).fillna(0) * 100
@@ -413,8 +422,10 @@ with tab3:
             "GDP寄与は相対的に小さいが利益占有率が高い業種。少ない付加価値で大きな利益を確保。",
         "大企業利益集中セクター":
             "大企業の利益シェアが付加価値シェアを大幅に上回る業種。大企業が利益を取りやすい構造。",
-        "中小企業GDP支援セクター":
-            "中小企業がGDP（付加価値）を支えているにもかかわらず、利益が薄い業種。",
+        "10億+利益集中セクター":
+            "資本金10億以上法人の利益シェアが付加価値シェアを大幅に上回る業種。",
+        "下位規模GDP支援セクター":
+            "下位規模の法人/事業所がGDP（付加価値）を支えているにもかかわらず、利益が薄い業種。",
         "企業数多・生産性低セクター":
             "企業数占有率が高いが1社あたり付加価値が低い業種。企業数の多さが生産性に直結していない。",
     }

@@ -35,7 +35,7 @@ def load_corporate_stats(data_dir: Path) -> pd.DataFrame:
     path = data_dir / "corporate_stats.csv"
     df = pd.read_csv(path, encoding="utf-8-sig")
     _require_columns(df, [
-        "jsic_code", "jsic_name", "company_size_category",
+        "jsic_code", "jsic_name", "capital_class", "company_size_category",
         "corp_company_count", "corp_employee_count",
         "value_added_corp_billion_jpy",
         "operating_profit_billion_jpy", "net_profit_billion_jpy",

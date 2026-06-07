@@ -50,33 +50,41 @@ def compute_sector_mismatches(
     f2 = f2[ratio >= threshold_ratio].sort_values("利益/GDP比率", ascending=False)
     findings["利益大・GDP寄与小セクター"] = f2
 
-    # 3. 大企業利益集中: 大企業の利益シェアが付加価値シェアを上回る
-    large_profit_share = (profit_matrix["大企業"] /
-                          profit_matrix[["大企業", "中小企業"]].sum(axis=1).replace(0, np.nan))
-    large_va_share = gdp_matrix["大企業"] / gdp_matrix.sum(axis=1).replace(0, np.nan)
-    gap = (large_profit_share - large_va_share)
-    threshold_gap = gap.dropna().quantile(0.70)
-    f3 = pd.DataFrame({
-        "大企業利益シェア(%)": (large_profit_share * 100).round(1),
-        "大企業付加価値シェア(%)": (large_va_share * 100).round(1),
-        "シェア差分(pp)": (gap * 100).round(1),
-    })
-    f3 = f3[gap.fillna(-np.inf) >= threshold_gap].sort_values("シェア差分(pp)", ascending=False)
-    findings["大企業利益集中セクター"] = f3
+    # 3-4: 「最大規模カラム」と「それ以外の合計」で大企業集中度を測る
+    # 経済センサスベース → 大企業/中小企業, 法人企業統計ベース → 10億+/その他
+    cols = list(profit_matrix.columns)
+    top_col = cols[0] if cols else None
 
-    # 4. 中小企業がGDPを支えるが利益薄: 中小の付加価値シェアが高いが営業利益率は低い
-    sme_va_share = (gdp_matrix["中小企業"] /
-                    gdp_matrix.sum(axis=1).replace(0, np.nan))
-    sme_profit_share = profit_matrix["中小企業"] / profit_matrix[["大企業", "中小企業"]].sum(axis=1).replace(0, np.nan)
-    gap2 = sme_va_share - sme_profit_share
-    threshold_sme = gap2.dropna().quantile(0.65)
-    f4 = pd.DataFrame({
-        "中小 GDP占有率(%)": (sme_va_share * 100).round(1),
-        "中小 利益シェア(%)": (sme_profit_share * 100).round(1),
-        "格差(pp)": (gap2 * 100).round(1),
-    })
-    f4 = f4[gap2.fillna(-np.inf) >= threshold_sme].sort_values("格差(pp)", ascending=False)
-    findings["中小企業GDP支援セクター"] = f4
+    if top_col is not None and top_col in gdp_matrix.columns:
+        gdp_total_sec = gdp_matrix.sum(axis=1).replace(0, np.nan)
+        prof_total_sec = profit_matrix.sum(axis=1).replace(0, np.nan)
+
+        large_profit_share = profit_matrix[top_col] / prof_total_sec
+        large_va_share = gdp_matrix[top_col] / gdp_total_sec
+        gap = large_profit_share - large_va_share
+        threshold_gap = gap.dropna().quantile(0.70) if gap.notna().any() else 0
+        f3 = pd.DataFrame({
+            f"{top_col} 利益シェア(%)": (large_profit_share * 100).round(1),
+            f"{top_col} 付加価値シェア(%)": (large_va_share * 100).round(1),
+            "シェア差分(pp)": (gap * 100).round(1),
+        })
+        f3 = f3[gap.fillna(-np.inf) >= threshold_gap].sort_values("シェア差分(pp)", ascending=False)
+        findings[f"{top_col}利益集中セクター"] = f3
+
+        # 残り（中小・小規模）側の付加価値支援度
+        rest_cols = cols[1:]
+        if rest_cols:
+            sme_va_share = gdp_matrix[rest_cols].sum(axis=1) / gdp_total_sec
+            sme_prof_share = profit_matrix[rest_cols].sum(axis=1) / prof_total_sec
+            gap2 = sme_va_share - sme_prof_share
+            threshold_sme = gap2.dropna().quantile(0.65) if gap2.notna().any() else 0
+            f4 = pd.DataFrame({
+                "下位規模 GDP占有率(%)": (sme_va_share * 100).round(1),
+                "下位規模 利益シェア(%)": (sme_prof_share * 100).round(1),
+                "格差(pp)": (gap2 * 100).round(1),
+            })
+            f4 = f4[gap2.fillna(-np.inf) >= threshold_sme].sort_values("格差(pp)", ascending=False)
+            findings["下位規模GDP支援セクター"] = f4
 
     # 5. 企業数多・生産性低: 企業数シェアが高いが1社あたり付加価値が低い
     count_total_per_sector = count_matrix.sum(axis=1)

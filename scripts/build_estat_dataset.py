@@ -138,11 +138,19 @@ CENSUS_LARGE_CODE = "6"      # 50人以上
 CENSUS_SME_CODES = ["1", "2", "3", "4", "5"]  # 1-4, 5-9, 10-19, 20-29, 30-49
 
 # 法人企業統計 資本金階級 cat03
-# 大企業 = 資本金10億円以上、中小企業 = それ未満（全規模からの差分）
-# 16: 1千万円未満（約209万社の小法人）も中小企業に編入することで、
-# 法人企業統計の母集団 約290万社 と整合する
-CORP_LARGE_CODE = "25"             # 10億円以上 (約4,688社)
-CORP_SME_CODES = ["24", "19", "16"]  # 1億-10億 + 1千万-1億 + 1千万未満 = 約290万社
+# 6つの atomic 階級（合算コード 18/19/22/23 は除外）
+CORP_CAPITAL_BINS: list[tuple[str, str]] = [
+    ("25", "10億+"),
+    ("24", "1億-10億"),
+    ("21", "5千万-1億"),
+    ("20", "2千万-5千万"),
+    ("17", "1千万-2千万"),
+    ("16", "1千万未満"),
+]
+CORP_CAPITAL_CODE_TO_LABEL = dict(CORP_CAPITAL_BINS)
+# 大企業 = 資本金10億円以上、それ未満は中小企業
+CORP_LARGE_CODE = "25"
+CORP_SME_CODES = ["24", "21", "20", "17", "16"]
 
 
 # ============================================================
@@ -310,11 +318,12 @@ def pull_corporate_stats(client: EStatClient, fiscal_year: int) -> pd.DataFrame:
     _info(f"[corp] long-form rows: {len(df)}")
 
     # cat03 (規模) フィルタ
+    df["capital_class"] = df["cat03"].map(CORP_CAPITAL_CODE_TO_LABEL)
+    df = df[df["capital_class"].notna()].copy()
     df["size_category"] = df["cat03"].map(
         lambda c: "大企業" if c == CORP_LARGE_CODE
         else ("中小企業" if c in CORP_SME_CODES else None)
     )
-    df = df[df["size_category"].notna()].copy()
 
     # cat02 (業種) フィルタ
     df = df[df["cat02"].isin(CORP_CAT02_TO_JSIC.keys())].copy()
@@ -343,14 +352,16 @@ def pull_corporate_stats(client: EStatClient, fiscal_year: int) -> pd.DataFrame:
         for j in jsic_codes:
             rows.append({
                 "jsic_code": j,
+                "capital_class": r["capital_class"],
                 "size_category": r["size_category"],
                 "metric": r["metric"],
                 "value": (r["value"] or 0) * share,
             })
     df2 = pd.DataFrame(rows)
-    agg = df2.groupby(["jsic_code", "size_category", "metric"], as_index=False)["value"].sum()
+    agg = df2.groupby(["jsic_code", "capital_class", "size_category", "metric"],
+                      as_index=False)["value"].sum()
     pivot = agg.pivot_table(
-        index=["jsic_code", "size_category"],
+        index=["jsic_code", "capital_class", "size_category"],
         columns="metric",
         values="value",
         aggfunc="sum",
@@ -380,18 +391,28 @@ def pull_corporate_stats(client: EStatClient, fiscal_year: int) -> pd.DataFrame:
         + pivot["retained_earnings_million_jpy"]
     ) / 1000.0
 
-    # 全 JSIC × {大企業, 中小企業} の組合せにreindex（金融保険業 J は0で残す）
+    # 全 JSIC × 全 capital_class の組合せにreindex（金融保険業 J は0で残す）
     all_codes = list(JSIC_NAMES.keys())
+    all_classes = [label for _, label in CORP_CAPITAL_BINS]
     index = pd.MultiIndex.from_product(
-        [all_codes, ["大企業", "中小企業"]],
-        names=["jsic_code", "company_size_category"],
+        [all_codes, all_classes],
+        names=["jsic_code", "capital_class"],
     )
     pivot = pivot.rename(columns={"size_category": "company_size_category"})
-    pivot = pivot.set_index(["jsic_code", "company_size_category"]).reindex(index, fill_value=0).reset_index()
+    pivot = (
+        pivot.set_index(["jsic_code", "capital_class"])
+             .reindex(index, fill_value=0)
+             .reset_index()
+    )
+    # company_size_category を capital_class から再付与（reindex で 0 になっているため）
+    pivot["company_size_category"] = pivot["capital_class"].map(
+        lambda c: "大企業" if c == "10億+" else "中小企業"
+    )
 
     out = pd.DataFrame({
         "jsic_code":                       pivot["jsic_code"],
         "jsic_name":                       pivot["jsic_code"].map(JSIC_NAMES),
+        "capital_class":                   pivot["capital_class"],
         "company_size_category":           pivot["company_size_category"],
         "corp_company_count":              pivot["corp_company_count"].astype(int),
         "corp_employee_count":             pivot["corp_employee_count"].astype(int),

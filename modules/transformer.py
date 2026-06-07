@@ -12,6 +12,23 @@ import numpy as np
 
 SIZES = ["大企業", "中小企業"]
 SECTOR_CODES = list("ABCDEFGHIJKLMNOPQRS")
+CAPITAL_CLASSES = ["10億+", "1億-10億", "5千万-1億", "2千万-5千万", "1千万-2千万", "1千万未満"]
+
+
+def _pivot_capital(df: pd.DataFrame, value_col: str, fill: float = 0.0) -> pd.DataFrame:
+    """Pivot to (jsic_code x capital_class) matrix."""
+    pt = df.pivot_table(
+        index="jsic_code",
+        columns="capital_class",
+        values=value_col,
+        aggfunc="sum",
+    )
+    pt = pt.reindex(index=SECTOR_CODES)
+    for c in CAPITAL_CLASSES:
+        if c not in pt.columns:
+            pt[c] = fill
+    pt = pt[CAPITAL_CLASSES].fillna(fill)
+    return pt
 
 
 def _pivot(df: pd.DataFrame, value_col: str, fill: float = 0.0) -> pd.DataFrame:
@@ -136,6 +153,66 @@ def build_corp_per_person_profit_matrix(df_corp: pd.DataFrame) -> pd.DataFrame:
     """営業利益 / 期中平均従業員数 → 万円/人（規模定義一致）。"""
     profit = _pivot(df_corp, "operating_profit_billion_jpy")
     emp    = _pivot(df_corp, "corp_employee_count").replace(0, np.nan)
+    out = (profit / emp * 1e5).fillna(0)
+    out.index.name = "jsic_code"
+    return out
+
+
+# ── 法人企業統計ベース・資本金階級6区分 ─────────────
+# 横軸を「10億+/1億-10億/5千万-1億/2千万-5千万/1千万-2千万/1千万未満」の6列に展開した
+# 細粒度マトリクス。法人企業統計モード時に使用。
+
+def build_corp_company_count_by_capital(df_corp: pd.DataFrame) -> pd.DataFrame:
+    pt = _pivot_capital(df_corp, "corp_company_count")
+    pt.index.name = "jsic_code"
+    return pt
+
+
+def build_corp_employee_count_by_capital(df_corp: pd.DataFrame) -> pd.DataFrame:
+    pt = _pivot_capital(df_corp, "corp_employee_count")
+    pt.index.name = "jsic_code"
+    return pt
+
+
+def build_corp_value_added_by_capital(df_corp: pd.DataFrame) -> pd.DataFrame:
+    pt = _pivot_capital(df_corp, "value_added_corp_billion_jpy")
+    pt.index.name = "jsic_code"
+    return pt
+
+
+def build_corp_profit_by_capital(df_corp: pd.DataFrame) -> pd.DataFrame:
+    pt = _pivot_capital(df_corp, "operating_profit_billion_jpy")
+    pt.index.name = "jsic_code"
+    return pt
+
+
+def build_corp_per_company_va_by_capital(df_corp: pd.DataFrame) -> pd.DataFrame:
+    va  = _pivot_capital(df_corp, "value_added_corp_billion_jpy")
+    cnt = _pivot_capital(df_corp, "corp_company_count").replace(0, np.nan)
+    out = (va / cnt * 1000).fillna(0)
+    out.index.name = "jsic_code"
+    return out
+
+
+def build_corp_per_person_va_by_capital(df_corp: pd.DataFrame) -> pd.DataFrame:
+    va  = _pivot_capital(df_corp, "value_added_corp_billion_jpy")
+    emp = _pivot_capital(df_corp, "corp_employee_count").replace(0, np.nan)
+    out = (va / emp * 1e5).fillna(0)
+    out.index.name = "jsic_code"
+    return out
+
+
+def build_corp_per_company_profit_by_capital(df_corp: pd.DataFrame) -> pd.DataFrame:
+    profit = _pivot_capital(df_corp, "operating_profit_billion_jpy")
+    cnt    = _pivot_capital(df_corp, "corp_company_count").replace(0, np.nan)
+    out = (profit / cnt * 1000).fillna(0)
+    out.index.name = "jsic_code"
+    return out
+
+
+def build_corp_per_person_profit_by_capital(df_corp: pd.DataFrame) -> pd.DataFrame:
+    profit = _pivot_capital(df_corp, "operating_profit_billion_jpy")
+    emp    = _pivot_capital(df_corp, "corp_employee_count").replace(0, np.nan)
     out = (profit / emp * 1e5).fillna(0)
     out.index.name = "jsic_code"
     return out
