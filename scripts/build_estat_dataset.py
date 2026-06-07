@@ -316,6 +316,9 @@ def pull_corporate_stats(client: EStatClient, fiscal_year: int) -> pd.DataFrame:
 
     # cat01 (調査項目) → metric
     METRIC_MAP = {
+        "001": "corp_company_count",         # 母集団（法人数）社
+        "072": "corp_employee_count",        # 期中平均従業員数 人
+        "073": "value_added_corp_million_jpy",  # 付加価値（法人企業統計の定義）百万円
         "048": "operating_profit_million_jpy",
         "056": "net_profit_million_jpy",
         "022": "total_assets_million_jpy",
@@ -355,13 +358,16 @@ def pull_corporate_stats(client: EStatClient, fiscal_year: int) -> pd.DataFrame:
         "total_assets_million_jpy",
         "capital_million_jpy", "capital_reserve_million_jpy",
         "earnings_reserve_million_jpy", "retained_earnings_million_jpy",
+        "value_added_corp_million_jpy",
+        "corp_company_count", "corp_employee_count",
     ]:
         if col not in pivot.columns:
             pivot[col] = 0.0
 
-    pivot["operating_profit_billion_jpy"] = pivot["operating_profit_million_jpy"] / 1000.0
-    pivot["net_profit_billion_jpy"]       = pivot["net_profit_million_jpy"] / 1000.0
-    pivot["total_assets_billion_jpy"]     = pivot["total_assets_million_jpy"] / 1000.0
+    pivot["operating_profit_billion_jpy"]   = pivot["operating_profit_million_jpy"] / 1000.0
+    pivot["net_profit_billion_jpy"]         = pivot["net_profit_million_jpy"] / 1000.0
+    pivot["total_assets_billion_jpy"]       = pivot["total_assets_million_jpy"] / 1000.0
+    pivot["value_added_corp_billion_jpy"]   = pivot["value_added_corp_million_jpy"] / 1000.0
     pivot["equity_billion_jpy"] = (
         pivot["capital_million_jpy"]
         + pivot["capital_reserve_million_jpy"]
@@ -379,16 +385,22 @@ def pull_corporate_stats(client: EStatClient, fiscal_year: int) -> pd.DataFrame:
     pivot = pivot.set_index(["jsic_code", "company_size_category"]).reindex(index, fill_value=0).reset_index()
 
     out = pd.DataFrame({
-        "jsic_code":                     pivot["jsic_code"],
-        "jsic_name":                     pivot["jsic_code"].map(JSIC_NAMES),
-        "company_size_category":         pivot["company_size_category"],
-        "operating_profit_billion_jpy":  pivot["operating_profit_billion_jpy"].round(2),
-        "net_profit_billion_jpy":        pivot["net_profit_billion_jpy"].round(2),
-        "total_assets_billion_jpy":      pivot["total_assets_billion_jpy"].round(2),
-        "equity_billion_jpy":            pivot["equity_billion_jpy"].round(2),
-        "survey_year":                   fiscal_year,
+        "jsic_code":                       pivot["jsic_code"],
+        "jsic_name":                       pivot["jsic_code"].map(JSIC_NAMES),
+        "company_size_category":           pivot["company_size_category"],
+        "corp_company_count":              pivot["corp_company_count"].astype(int),
+        "corp_employee_count":             pivot["corp_employee_count"].astype(int),
+        "value_added_corp_billion_jpy":    pivot["value_added_corp_billion_jpy"].round(2),
+        "operating_profit_billion_jpy":    pivot["operating_profit_billion_jpy"].round(2),
+        "net_profit_billion_jpy":          pivot["net_profit_billion_jpy"].round(2),
+        "total_assets_billion_jpy":        pivot["total_assets_billion_jpy"].round(2),
+        "equity_billion_jpy":              pivot["equity_billion_jpy"].round(2),
+        "survey_year":                     fiscal_year,
     })
 
+    _info(f"[corp] total corp_company_count: {out['corp_company_count'].sum():,}")
+    _info(f"[corp] total corp_employee_count: {out['corp_employee_count'].sum():,}")
+    _info(f"[corp] total value_added (corp def): {out['value_added_corp_billion_jpy'].sum():,.1f} billion JPY")
     _info(f"[corp] total operating_profit: {out['operating_profit_billion_jpy'].sum():,.1f} billion JPY")
     return out
 

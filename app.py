@@ -20,6 +20,13 @@ from modules.transformer import (
     build_per_person_matrix,
     build_per_company_profit_matrix,
     build_per_person_profit_matrix,
+    build_corp_company_count_matrix,
+    build_corp_employee_count_matrix,
+    build_corp_value_added_matrix,
+    build_corp_per_company_va_matrix,
+    build_corp_per_person_va_matrix,
+    build_corp_per_company_profit_matrix,
+    build_corp_per_person_profit_matrix,
     add_sector_names,
 )
 from modules.heatmap_builder import (
@@ -44,6 +51,22 @@ st.set_page_config(
 # ─── Sidebar ────────────────────────────────────────────────
 with st.sidebar:
     st.title("フィルタ")
+
+    db_source = st.radio(
+        "規模区分のデータソース",
+        [
+            "経済センサス（従業者50人で区切る・約478万事業所）",
+            "法人企業統計（資本金10億円で区切る・約104万法人）",
+        ],
+        index=0,
+        help=(
+            "経済センサス: 事業所ベース。大企業=従業者50人以上。\n"
+            "法人企業統計: 法人ベース。大企業=資本金10億円以上。\n"
+            "母集団・規模の定義が根本的に違うため、選んだソース内で全指標が完結する。"
+        ),
+        key="db_source_radio",
+    )
+    USE_CORP = db_source.startswith("法人企業統計")
 
     normalize = st.checkbox("正規化表示 (0–100%)", value=False,
                             help="各指標を0–100%に正規化して相対的な大小を比較します")
@@ -84,6 +107,7 @@ def _build_matrices(
     sectors   = pd.read_json(sectors_json, orient="split")
 
     raw = {
+        # 経済センサスベース（従業者規模）
         "gdp":         build_gdp_matrix(df_census, df_gdp),
         "profit":      build_profit_matrix(df_corp),
         "count":       build_company_count_matrix(df_census),
@@ -92,6 +116,14 @@ def _build_matrices(
         "per_pp":      build_per_person_matrix(df_census),
         "per_co_pft":  build_per_company_profit_matrix(df_census, df_corp),
         "per_pp_pft":  build_per_person_profit_matrix(df_census, df_corp),
+        # 法人企業統計ベース（資本金階級）
+        "corp_count":      build_corp_company_count_matrix(df_corp),
+        "corp_emp":        build_corp_employee_count_matrix(df_corp),
+        "corp_va":         build_corp_value_added_matrix(df_corp),
+        "corp_per_co_va":  build_corp_per_company_va_matrix(df_corp),
+        "corp_per_pp_va":  build_corp_per_person_va_matrix(df_corp),
+        "corp_per_co_pft": build_corp_per_company_profit_matrix(df_corp),
+        "corp_per_pp_pft": build_corp_per_person_profit_matrix(df_corp),
     }
     # Attach sector names as index
     named = {k: add_sector_names(v, sectors) for k, v in raw.items()}
@@ -145,15 +177,26 @@ def _scale(m: pd.DataFrame) -> tuple[pd.DataFrame, str, str]:
     return m, unit_label, fmt
 
 
-# Apply filters
-m_gdp    = _apply_filters(matrices["gdp"])
-m_profit = _apply_filters(matrices["profit"])
-m_count  = _apply_filters(matrices["count"])
-m_emp    = _apply_filters(matrices["emp"])
-m_per_co     = _apply_filters(matrices["per_co"])
-m_per_pp     = _apply_filters(matrices["per_pp"])
-m_per_co_pft = _apply_filters(matrices["per_co_pft"])
-m_per_pp_pft = _apply_filters(matrices["per_pp_pft"])
+# データソース切替: 法人企業統計選択時は count/emp/付加価値関連を法人企業統計版に差し替え
+if USE_CORP:
+    # GDP寄与（付加価値）= 法人企業統計の付加価値
+    m_gdp        = _apply_filters(matrices["corp_va"])
+    m_profit     = _apply_filters(matrices["profit"])
+    m_count      = _apply_filters(matrices["corp_count"])
+    m_emp        = _apply_filters(matrices["corp_emp"])
+    m_per_co     = _apply_filters(matrices["corp_per_co_va"])
+    m_per_pp     = _apply_filters(matrices["corp_per_pp_va"])
+    m_per_co_pft = _apply_filters(matrices["corp_per_co_pft"])
+    m_per_pp_pft = _apply_filters(matrices["corp_per_pp_pft"])
+else:
+    m_gdp        = _apply_filters(matrices["gdp"])
+    m_profit     = _apply_filters(matrices["profit"])
+    m_count      = _apply_filters(matrices["count"])
+    m_emp        = _apply_filters(matrices["emp"])
+    m_per_co     = _apply_filters(matrices["per_co"])
+    m_per_pp     = _apply_filters(matrices["per_pp"])
+    m_per_co_pft = _apply_filters(matrices["per_co_pft"])
+    m_per_pp_pft = _apply_filters(matrices["per_pp_pft"])
 
 if m_gdp.empty:
     st.warning("フィルタ条件に該当するデータがありません。")
@@ -165,9 +208,10 @@ m_profit_s, pft_unit, _    = _scale(m_profit)
 
 # ─── KPI Bar ─────────────────────────────────────────────────
 st.title("日本経済 セクター別・規模別 分布分析")
+_src_label = "法人企業統計ベース（資本金10億で区切る）" if USE_CORP else "経済センサスベース（従業者50人で区切る）"
 st.caption(
-    "JSIC大分類（約19業種） × 企業規模（大企業・中小企業）で分解した"
-    "GDP寄与・利益・企業数・生産性の分布を可視化"
+    f"JSIC大分類（約19業種） × 企業規模（大企業・中小企業）で分解 — "
+    f"**現在のデータソース: {_src_label}**"
 )
 with st.expander("データソース・前提・近似", expanded=False):
     st.markdown(

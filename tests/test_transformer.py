@@ -6,6 +6,13 @@ from modules.transformer import (
     SECTOR_CODES,
     SIZES,
     build_company_count_matrix,
+    build_corp_company_count_matrix,
+    build_corp_employee_count_matrix,
+    build_corp_per_company_profit_matrix,
+    build_corp_per_company_va_matrix,
+    build_corp_per_person_profit_matrix,
+    build_corp_per_person_va_matrix,
+    build_corp_value_added_matrix,
     build_employee_count_matrix,
     build_gdp_matrix,
     build_per_company_matrix,
@@ -27,9 +34,9 @@ def _mini_census() -> pd.DataFrame:
 
 def _mini_corp() -> pd.DataFrame:
     return pd.DataFrame([
-        {"jsic_code": "A", "company_size_category": "大企業",   "operating_profit_billion_jpy": 5,  "net_profit_billion_jpy": 3, "total_assets_billion_jpy": 200, "equity_billion_jpy": 80, "survey_year": 2023},
-        {"jsic_code": "E", "company_size_category": "大企業",   "operating_profit_billion_jpy": 1_000, "net_profit_billion_jpy": 700, "total_assets_billion_jpy": 30_000, "equity_billion_jpy": 12_000, "survey_year": 2023},
-        {"jsic_code": "E", "company_size_category": "中小企業", "operating_profit_billion_jpy": 400,   "net_profit_billion_jpy": 250, "total_assets_billion_jpy": 15_000, "equity_billion_jpy": 5_000, "survey_year": 2023},
+        {"jsic_code": "A", "company_size_category": "大企業",   "corp_company_count": 10,    "corp_employee_count": 5_000,    "value_added_corp_billion_jpy": 30,    "operating_profit_billion_jpy": 5,     "net_profit_billion_jpy": 3,   "total_assets_billion_jpy": 200,    "equity_billion_jpy": 80,     "survey_year": 2023},
+        {"jsic_code": "E", "company_size_category": "大企業",   "corp_company_count": 1_500, "corp_employee_count": 2_000_000, "value_added_corp_billion_jpy": 40_000, "operating_profit_billion_jpy": 1_000, "net_profit_billion_jpy": 700, "total_assets_billion_jpy": 30_000, "equity_billion_jpy": 12_000, "survey_year": 2023},
+        {"jsic_code": "E", "company_size_category": "中小企業", "corp_company_count": 100_000, "corp_employee_count": 5_000_000, "value_added_corp_billion_jpy": 30_000, "operating_profit_billion_jpy": 400,   "net_profit_billion_jpy": 250, "total_assets_billion_jpy": 15_000, "equity_billion_jpy": 5_000,  "survey_year": 2023},
     ])
 
 
@@ -99,3 +106,39 @@ def test_per_person_profit_unit_conversion():
     # E 大企業: 利益 1,000 billion / 200,000人 * 1e5 = 500 万円/人
     m = build_per_person_profit_matrix(_mini_census(), _mini_corp())
     assert m.loc["E", "大企業"] == pytest.approx(1_000 * 1e5 / 200_000)
+
+
+# ── 法人企業統計ベース ──────────────────────────────
+
+def test_corp_company_count():
+    m = build_corp_company_count_matrix(_mini_corp())
+    assert m.loc["E", "大企業"] == 1_500
+    assert m.loc["E", "中小企業"] == 100_000
+
+
+def test_corp_value_added():
+    m = build_corp_value_added_matrix(_mini_corp())
+    assert m.loc["E", "大企業"] == 40_000
+    assert m.loc["E", "中小企業"] == 30_000
+
+
+def test_corp_per_company_profit_matches_real_definition():
+    # E 大企業（資本金10億+）: 利益 1,000 billion / 1,500社 * 1000 = 666.7 百万円/社
+    m = build_corp_per_company_profit_matrix(_mini_corp())
+    assert m.loc["E", "大企業"] == pytest.approx(1_000 * 1000 / 1_500)
+
+
+def test_corp_per_person_va():
+    # E 大企業: 付加価値 40,000 billion / 2,000,000人 * 1e5 = 2,000 万円/人
+    m = build_corp_per_person_va_matrix(_mini_corp())
+    assert m.loc["E", "大企業"] == pytest.approx(40_000 * 1e5 / 2_000_000)
+
+
+def test_corp_employee_count_pivot():
+    m = build_corp_employee_count_matrix(_mini_corp())
+    assert m.loc["E", "大企業"] == 2_000_000
+
+
+def test_corp_per_person_profit():
+    m = build_corp_per_person_profit_matrix(_mini_corp())
+    assert m.loc["E", "中小企業"] == pytest.approx(400 * 1e5 / 5_000_000)

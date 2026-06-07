@@ -83,6 +83,64 @@ def build_per_person_matrix(df_census: pd.DataFrame) -> pd.DataFrame:
     return per_pp
 
 
+# ── 法人企業統計ベース（資本金階級）──────────────────
+# 大企業 = 資本金10億円以上、中小 = 1千万〜10億円未満。
+# 母集団/従業員数/付加価値/営業利益すべて法人企業統計内で完結する。
+
+def build_corp_company_count_matrix(df_corp: pd.DataFrame) -> pd.DataFrame:
+    pt = _pivot(df_corp, "corp_company_count")
+    pt.index.name = "jsic_code"
+    return pt
+
+
+def build_corp_employee_count_matrix(df_corp: pd.DataFrame) -> pd.DataFrame:
+    pt = _pivot(df_corp, "corp_employee_count")
+    pt.index.name = "jsic_code"
+    return pt
+
+
+def build_corp_value_added_matrix(df_corp: pd.DataFrame) -> pd.DataFrame:
+    pt = _pivot(df_corp, "value_added_corp_billion_jpy")
+    pt.index.name = "jsic_code"
+    return pt
+
+
+def build_corp_per_company_va_matrix(df_corp: pd.DataFrame) -> pd.DataFrame:
+    """法人企業統計の付加価値 / 母集団 → 百万円/社（規模定義一致）。"""
+    va  = _pivot(df_corp, "value_added_corp_billion_jpy")
+    cnt = _pivot(df_corp, "corp_company_count").replace(0, np.nan)
+    out = (va / cnt * 1000).fillna(0)
+    out.index.name = "jsic_code"
+    return out
+
+
+def build_corp_per_person_va_matrix(df_corp: pd.DataFrame) -> pd.DataFrame:
+    """法人企業統計の付加価値 / 期中平均従業員数 → 万円/人（規模定義一致）。"""
+    va  = _pivot(df_corp, "value_added_corp_billion_jpy")
+    emp = _pivot(df_corp, "corp_employee_count").replace(0, np.nan)
+    out = (va / emp * 1e5).fillna(0)
+    out.index.name = "jsic_code"
+    return out
+
+
+def build_corp_per_company_profit_matrix(df_corp: pd.DataFrame) -> pd.DataFrame:
+    """営業利益 / 母集団 → 百万円/社（規模定義一致）。"""
+    profit = _pivot(df_corp, "operating_profit_billion_jpy")
+    cnt    = _pivot(df_corp, "corp_company_count").replace(0, np.nan)
+    out = (profit / cnt * 1000).fillna(0)
+    out.index.name = "jsic_code"
+    return out
+
+
+def build_corp_per_person_profit_matrix(df_corp: pd.DataFrame) -> pd.DataFrame:
+    """営業利益 / 期中平均従業員数 → 万円/人（規模定義一致）。"""
+    profit = _pivot(df_corp, "operating_profit_billion_jpy")
+    emp    = _pivot(df_corp, "corp_employee_count").replace(0, np.nan)
+    out = (profit / emp * 1e5).fillna(0)
+    out.index.name = "jsic_code"
+    return out
+
+
 def build_per_company_profit_matrix(df_census: pd.DataFrame, df_corp: pd.DataFrame) -> pd.DataFrame:
     """営業利益 / 企業数 → 百万円/社.
 
