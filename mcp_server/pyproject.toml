@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gdp-distribution-mcp"
+version = "0.1.0"
+description = "GDP_distribution MCP Server: JSIC × 規模 × 年度 の業績分析を MCP ツールとして公開"
+requires-python = ">=3.11"
+dependencies = [
+    "mcp>=1.0",
+    "pandas>=2.0",
+    "numpy>=1.26",
+    "pyyaml>=6.0",
+    "python-dotenv>=1.0",
+]

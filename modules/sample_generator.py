@@ -1,4 +1,10 @@
 """
+DEPRECATED. オフライン/APIキー無し環境向けのフォールバック専用。
+生成データは「全業種で企業数が等分」など現実に反した合成値である（line 103 参照）。
+通常運用では scripts/build_estat_dataset.py で e-Stat から実データを取得すること。
+出力スキーマは旧 JPX33 × 3規模 のまま残しているが、現行アプリは JSIC × 2規模 を要求するため
+このスクリプトをそのまま流すとアプリは起動しない。
+
 Synthetic sample data generator for GDP_distribution.
 Produces structurally realistic data for all 33 JPX sectors × 3 size categories.
 seed=42 for reproducibility.

@@ -1,0 +1,60 @@
+# JSIC 大分類 (日本標準産業分類 第14回改定)
+# T 分類不能の産業 は除外
+sectors:
+  - code: A
+    name_ja: 農業，林業
+    name_en: Agriculture and Forestry
+  - code: B
+    name_ja: 漁業
+    name_en: Fisheries
+  - code: C
+    name_ja: 鉱業，採石業，砂利採取業
+    name_en: Mining and Quarrying
+  - code: D
+    name_ja: 建設業
+    name_en: Construction
+  - code: E
+    name_ja: 製造業
+    name_en: Manufacturing
+  - code: F
+    name_ja: 電気・ガス・熱供給・水道業
+    name_en: Electricity, Gas, Heat Supply and Water
+  - code: G
+    name_ja: 情報通信業
+    name_en: Information and Communications
+  - code: H
+    name_ja: 運輸業，郵便業
+    name_en: Transport and Postal Services
+  - code: I
+    name_ja: 卸売業，小売業
+    name_en: Wholesale and Retail Trade
+  - code: J
+    name_ja: 金融業，保険業
+    name_en: Finance and Insurance
+  - code: K
+    name_ja: 不動産業，物品賃貸業
+    name_en: Real Estate and Goods Rental
+  - code: L
+    name_ja: 学術研究，専門・技術サービス業
+    name_en: Scientific Research and Technical Services
+  - code: M
+    name_ja: 宿泊業，飲食サービス業
+    name_en: Accommodations, Eating and Drinking Services
+  - code: N
+    name_ja: 生活関連サービス業，娯楽業
+    name_en: Living-Related and Personal Services, Amusement
+  - code: O
+    name_ja: 教育，学習支援業
+    name_en: Education and Learning Support
+  - code: P
+    name_ja: 医療，福祉
+    name_en: Medical, Health Care and Welfare
+  - code: Q
+    name_ja: 複合サービス事業
+    name_en: Compound Services
+  - code: R
+    name_ja: サービス業（他に分類されないもの）
+    name_en: Services (Not Elsewhere Classified)
+  - code: S
+    name_ja: 公務（他に分類されるものを除く）
+    name_en: Government (Except Elsewhere Classified)
